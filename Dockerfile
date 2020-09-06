@@ -40,6 +40,7 @@ RUN dpkg --add-architecture i386 && \
     file \
     python3-distutils \
     bison \
+    sudo \
     tzdata --fix-missing && \
     rm -rf /var/lib/apt/list/*
 
@@ -65,16 +66,6 @@ RUN python3 -m pip install -U pip && \
     r2pipe
 
 RUN gem install one_gadget seccomp-tools && rm -rf /var/lib/gems/2.*/cache/*
-
-RUN git clone --depth 1 https://github.com/pwndbg/pwndbg && \
-    cd pwndbg && chmod +x setup.sh && ./setup.sh
-
-RUN git clone --depth 1 https://github.com/scwuaptx/Pwngdb.git /root/Pwngdb && \
-    cd /root/Pwngdb && cat /root/Pwngdb/.gdbinit  >> /root/.gdbinit && \
-    sed -i "s?source ~/peda/peda.py?# source ~/peda/peda.py?g" /root/.gdbinit
-
-RUN git clone --depth 1 https://github.com/niklasb/libc-database.git libc-database && \
-    cd libc-database && ./get || echo "/libc-database/" > ~/.libcdb_path
 
 WORKDIR /ctf/work/
 
@@ -103,4 +94,21 @@ COPY linux_server linux_server64  /ctf/
 
 RUN chmod a+x /ctf/linux_server /ctf/linux_server64
 
-CMD ["/sbin/my_init"]
+# Create non-root user
+RUN useradd -m pwn && \
+  adduser pwn sudo && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+  echo "pwn:pwn" | chpasswd
+
+# Initilise base user
+USER pwn
+ENV HOME /home/pwn
+
+RUN git clone --depth 1 https://github.com/pwndbg/pwndbg ${HOME}/pwndbg && \
+    cd ${HOME}/pwndbg && chmod +x setup.sh && ./setup.sh && \
+    git clone --depth 1 https://github.com/scwuaptx/Pwngdb.git ${HOME}/Pwngdb && \
+    cd ${HOME}/Pwngdb && cat /home/pwn/Pwngdb/.gdbinit  >> ${HOME}/.gdbinit && \
+    sed -i "s?source ~/peda/peda.py?# source ~/peda/peda.py?g" ${HOME}/.gdbinit && \
+    git clone --depth 1 https://github.com/niklasb/libc-database.git ${HOME}/libc-database && \
+    cd ${HOME}/libc-database && ./get || echo "/libc-database/" > ${HOME}/.libcdb_path
+
+ENTRYPOINT ["sleep", "infinity"]
